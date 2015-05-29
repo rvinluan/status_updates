@@ -29,11 +29,11 @@ function searchJust() {
   console.log("verb::"+verb);
   var query = ("%22I just " + verb + "%22");
   T.get('search/tweets', { q: query, count: 1 }, function(err, data, response) {
-    if (handleErrors(err, data)) {return;}
     if (handleErrors(err, data) == 2) {
       searchJust();
       return;
     }
+    if (handleErrors(err, data)) {return;}
     for(var i = 0; i < data.statuses.length; i++) {
       var text = data.statuses[i].text;
       var op = getOperative(text, verb);
@@ -47,21 +47,20 @@ function searchJust() {
 }
 
 function searchInCase() {
-  T.get('search/tweets', { q: "%22is fun%22", count: 20 }, function(err, data, response) {
+  var emotions = [
+    'fun', 'lame', 'awesome', 'shitty', 'great',
+    'amazing', 'stupid', 'boring', 'eventful'
+  ];
+  var emotion = emotions[Math.floor(Math.random() * emotions.length)];
+  T.get('search/tweets', { q: "%22is "+emotion+"%22 -RT", count: 10 }, function(err, data, response) {
     if (handleErrors(err, data)) {return;}
-    console.log('icyww::');
+    console.log('\033[36m');
     for(var i = 0; i < data.statuses.length; i++) {
       console.log(data.statuses[i].text);
       var icyww = data.statuses[i].text;
+      console.log('\033[35m' + getActivity(icyww, emotion) + '\033[36m');
     }
-    console.log('icyww-end::');
-    // var randomIndex = Math.floor(Math.random() * 20);
-    if (icyww) {
-      var activity = getActivity(icyww);
-      console.log("activity::"+activity);
-    } else {
-      console.log("no tweets");
-    }
+    console.log('\033[0m');
   });
 }
 
@@ -80,17 +79,49 @@ function getOperative(str, verb) {
     return restOfString;
 }
 
-function getActivity(tweet) {
-  console.log("activitytweet::"+tweet);
+function getActivity(tweet, emotion) {
   var tokens = tweet.toLowerCase().split(" ");
-  var is = tokens.indexOf("is");
-  console.log("isIndex::"+is);
-  if(is >= tokens.length - 1 || is < 1) {
-    return "my day";
+  var isIndex = -1;
+  var newPhraseArray = [];
+  var posArray = [];
+  //loop through and find the 'is [emotion]'
+  for(var i = 0; i < tokens.length; i++) {
+    if( i >= tokens.length - 1) {
+      break; //stop the loop now before even doing the check
+    }
+    if(
+      tokens[i].indexOf("is") !== -1 &&
+      tokens[i+1].indexOf(emotion) !== -1
+    ) {
+      isIndex = i;
+    }
   }
-  if(tokens[is+1].indexOf("fun") !== -1) {
-    return tokens[is - 2] +" "+ tokens[is - 1];
+
+  if(isIndex == -1) {
+    return "my day"; //generic, because we couldn't find anything in this tweet
   }
+
+  //let's look at the 3 words before the "is [emotion]"
+  //some of these will be undefined, that's ok
+  for(var i = 0; i < 3; i++) {
+    var text = tokens[isIndex - (3 - i)];
+    if(!text || text.charAt(0) == '@' || text.indexOf('http') !== -1) {
+      newPhraseArray[i] = new rita.RiString("");
+    } else {    
+      newPhraseArray[i] = new rita.RiString(text);
+    }
+    posArray[i] = newPhraseArray[i].pos()[0];
+  }
+  // console.log('\033[35m');
+  // console.log(newPhraseArray);
+  // console.log(posArray);
+  // console.log('\033[0m');
+
+  var threewordphrase = newPhraseArray.map(function (value) {
+    return value._text;
+  })
+
+  return threewordphrase.join(" ");
 }
 
 function randomGerund() {
@@ -109,11 +140,11 @@ function thoughtEndings() {
     +"(and |but |so |then )|" //connecting words (with spaces so as not to match 'some' or 'butter')
     +"(\\s[-–—]\\s)|" //hyphen and dashes, but not hyphenated words
     +"(http)|" //a url
-    +"@[a-zA_Z\\d]+" //a username
+    +"@[a-zA_Z\\d]+" //a twitter handle
   ,'i')
 }
 
-//searchJust();
+searchJust();
 
-var test = new rita.RiString("his year");
-console.log(test.pos());
+// var test = new rita.RiString("his year");
+// console.log(test.pos());
