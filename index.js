@@ -4,11 +4,13 @@ var lexicon = rita.RiLexicon();
 var Twit = require('twit');
 var T = new Twit(require('./config.js'));
 
-var CronJob = require('cron').CronJob;
-new CronJob('0 * * * * *', function() {
-  //tweet once, once an hour
-  searchJust();
-}, null, true, 'America/New_York');
+// var CronJob = require('cron').CronJob;
+// new CronJob('0 * * * * *', function() {
+//   //tweet once, once an hour
+//   searchJust();
+// }, null, true, 'America/New_York');
+
+searchJust();
 
 function tweet(sts) {
   T.post('statuses/update', { status: sts }, function(err, data, response) {
