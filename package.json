@@ -1,0 +1,22 @@
+{
+  "name": "Status Updates Bot",
+  "version": "0.1.0",
+  "description": "@justdidathing on Twitter.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "twit": "1.1.20",
+    "rita": "1.0.85"
+  },
+  "engines": {
+    "node": "0.12.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rvinluan/status_updates"
+  },
+  "keywords": ["node", "bot", "twitter", "#botALLY"],
+  "license": "MIT"
+}

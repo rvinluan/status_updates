@@ -1,0 +1,7 @@
+{
+  "name": "Status Updates Bot",
+  "description": "@justdidathing on Twitter.",
+  "repository": "https://github.com/rvinluan/status_updates",
+  "logo": "hi",
+  "keywords": ["node", "bot", "twitter", "#botALLY"]
+}
