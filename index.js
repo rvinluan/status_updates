@@ -7,7 +7,9 @@ var finalTweet = "I just ";
 
 function tweet(sts) {
   T.post('statuses/update', { status: sts }, function(err, data, response) {
-    // console.log('THE TWEET:' + data.text);
+    if(err) {
+      console.log("There was an err:"+err);
+    }
   })
 }
 
@@ -36,36 +38,62 @@ function searchJust() {
     if (handleErrors(err, data)) {return;}
     for(var i = 0; i < data.statuses.length; i++) {
       var text = data.statuses[i].text;
-      var op = getOperative(text, verb);
-      // console.log("text::"+text);
-      console.log("operative::"+op);
+      var op = getOperative(text.toLowerCase(), verb.toLowerCase());
+      console.log("text::"+text);
+      // console.log("operative::"+op);
 
+      //trim op for whitespace
+      if(op.charAt(op.length - 1) == " ") {
+        op = op.slice(0, -1);
+      }
+      finalTweet += op;
       //the 'in case you were wondering part'
       var icyww = searchInCase();
     }
   })
 }
 
+//searches for tweets of the form 'x is fun'
+//will also use other emotions like awesome or lame in place of fun
 function searchInCase() {
   var emotions = [
     'fun', 'lame', 'awesome', 'shitty', 'great',
-    'amazing', 'stupid', 'boring', 'eventful'
+    'amazing', 'stupid', 'boring', 'eventful',
+    'perfect', 'unbelievable', 'ridiculous',
+    'intense', 'crazy', 'good', 'exciting', 'sad'
   ];
   var emotion = emotions[Math.floor(Math.random() * emotions.length)];
   T.get('search/tweets', { q: "%22is "+emotion+"%22 -RT", count: 10 }, function(err, data, response) {
     if (handleErrors(err, data)) {return;}
-    console.log('\033[36m');
+    console.log('\033[91m');  
+    var finalag;
     for(var i = 0; i < data.statuses.length; i++) {
       console.log(data.statuses[i].text);
       var icyww = data.statuses[i].text;
-      console.log('\033[35m' + getActivity(icyww, emotion) + '\033[36m');
+      var activity = getActivity(icyww, emotion);
+      var ag = getAcceptableGrammar(activity);
+      if (ag) {
+        finalag = ag;
+        console.log('\033[32mPASS: ' + ag + '\033[91m');
+        // break;
+      } else {
+        console.log('\033[34m' + activity.words.join(" ") + '\033[91m');
+        continue;
+      }
     }
-    console.log('\033[0m');
+    console.log('\033[0m');  
+    //we should have the final tweet now
+    if(finalag) {
+      finalTweet += ", in case you were wondering how " + finalag + " is going";
+    }
+    console.log("FINAL TWEET ============================("+finalTweet.length+")!");
+    console.log(finalTweet);
+    tweet(finalTweet);
   });
 }
 
+//find the part of a tweet that follows 'I just [verbed]'
 function getOperative(str, verb) {
-  //find only the part that follows 'I just [verbed]'
   var verbIndex = str.indexOf(verb);
   var restOfString = str.substr(verbIndex);
   //match restOfString to a regex that identifies thought endings (see function below)
@@ -79,11 +107,16 @@ function getOperative(str, verb) {
     return restOfString;
 }
 
+//find the part of the tweet that precedes 'is [emotion]'
 function getActivity(tweet, emotion) {
   var tokens = tweet.toLowerCase().split(" ");
   var isIndex = -1;
   var newPhraseArray = [];
   var posArray = [];
+  var returnObject = {
+    words: [],
+    pos: []
+  }
   //loop through and find the 'is [emotion]'
   for(var i = 0; i < tokens.length; i++) {
     if( i >= tokens.length - 1) {
@@ -98,13 +131,14 @@ function getActivity(tweet, emotion) {
   }
 
   if(isIndex == -1) {
-    return "my day"; //generic, because we couldn't find anything in this tweet
+    return returnObject;
   }
 
   //let's look at the 3 words before the "is [emotion]"
   //some of these will be undefined, that's ok
   for(var i = 0; i < 3; i++) {
     var text = tokens[isIndex - (3 - i)];
+    //filter out usernames and links
     if(!text || text.charAt(0) == '@' || text.indexOf('http') !== -1) {
       newPhraseArray[i] = new rita.RiString("");
     } else {    
@@ -117,34 +151,96 @@ function getActivity(tweet, emotion) {
   // console.log(posArray);
   // console.log('\033[0m');
 
-  var threewordphrase = newPhraseArray.map(function (value) {
+  var threewordphrase = newPhraseArray.map(function (value, index) {
     return value._text;
   })
 
-  return threewordphrase.join(" ");
+  //returns the 3 words and their parts of speech
+  return {
+    words: threewordphrase,
+    pos: posArray
+  }
 }
 
 function randomGerund() {
   var baseVerb = lexicon.randomWord("vb");
-  var gerund = rita.RiTa.conjugate(baseVerb, {
-    tense: rita.RiTa.PRESENT_PARTICIPLE
-  });
-  console.log("GERUND::"+gerund);
+  return rita.RiTa.getPresentParticiple(baseVerb);
 }
 
-//outputs a regex that checks for what I consider to be pauses or endings in thought
+//outputs a regex that checks for things that can be considered to be pauses or endings in thought
 function thoughtEndings() {
   return new RegExp(""
     +"[.?!,&…]|" //common punctuation
     +"\\n|" //newline
-    +"(and |but |so |then )|" //connecting words (with spaces so as not to match 'some' or 'butter')
+    +"\\s(and|but|so|then|because|therefore)\\s|" //connecting words (with spaces so as not to match 'some' or 'husband')
     +"(\\s[-–—]\\s)|" //hyphen and dashes, but not hyphenated words
     +"(http)|" //a url
-    +"@[a-zA_Z\\d]+" //a twitter handle
+    +"@[a-zA-Z\\d_]+" //a twitter handle
   ,'i')
 }
 
-searchJust();
+//use the parts of speec of the words to see if they would make sense
+//when inserted into the form 'how X is going'
+function getAcceptableGrammar(activity) {
+  var posArray = activity.pos;
+      wordsArray = activity.words;
+  if (!posArray) {
+    throw new Error("couldn't find the is [emotion] in the tweet.");
+  };
+  var acceptable3words = [
+    ['vbg', '*', 'nn'], //gerund + noun (being a dog, making my bed)
+    ['vbg', '*', 'nns'], //plural
+    ['prp$', '*', 'nn'], //possessive + noun (my best friend, your winged eyeliner)
+    ['prp$', '*', 'nns'], //plural
+    ['dt', '*', 'nn'], //determiner + noun (the united states)
+    ['dt', '*', 'nns'] //plural
+  ];
+  var acceptable2words = [
+    ['*', 'prp$', 'nn'], //possessive + noun (my day, her hair)
+    ['*', 'prp$', 'nns'], //plural
+    ['*', 'dt', 'nn'], //determiner + noun (the night, this year)
+    ['*', 'dt', 'nns'], //plural
+    ['*', 'vbg', '*'], //gerund phrase (dancing tonight, making love)
+    ['*', 'prp$', 'vbg'], //possessive + gerund (my driving)
+    ['*', 'dt', 'vbg'] //determiner + gerund (the painting)
+  ];
+  var passes = [];
+  for(var i = 0; i < acceptable3words.length; i++) {
+    var testArray = acceptable3words[i];
+    for(var j = 0; j < 3; j++) {
+      var expected = testArray[j];
+      if(expected == '*' || expected == posArray[j]) { passes[j] = true; }
+      else { passes[j] = false; }
+    }
+    if ( passes[0] && passes[1] && passes[2] ) {
+      return activity.words.join(" ");
+    } else {
+      passes[0] = false;
+      passes[1] = false;
+      passes[2] = false;
+    }
+  }
+  passes[0] = false;
+  passes[1] = false;
+  passes[2] = false;
+  //then check for 2 word phrases
+  for(var i = 0; i < acceptable2words.length; i++) {
+    var testArray = acceptable2words[i];
+    for(var j = 0; j < 3; j++) {
+      var expected = testArray[j];
+      if(expected == '*' || expected == posArray[j]) { passes[j] = true; }
+      else { passes[j] = false; }
+    }
+    if( passes[1] && passes[2] ) {
+      return wordsArray[1] + " " + wordsArray[2];
+    }
+  }
+  //no phrases passed.
+  //last ditch effort:
+  if(posArray[2] === "vbg") {
+    return wordsArray[2];
+  }
+  return "";
+}
 
-// var test = new rita.RiString("his year");
-// console.log(test.pos());
+searchJust();
