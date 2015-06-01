@@ -1,5 +1,5 @@
 {
-  "name": "Status Updates Bot",
+  "name": "status updates bot",
   "version": "0.1.0",
   "description": "@justdidathing on Twitter.",
   "main": "index.js",
@@ -11,7 +11,8 @@
     "rita": "1.0.85"
   },
   "engines": {
-    "node": "0.12.2"
+    "node": "0.12.2",
+    "npm": "1.4.16"
   },
   "repository": {
     "type": "git",
