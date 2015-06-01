@@ -4,7 +4,11 @@ var lexicon = rita.RiLexicon();
 var Twit = require('twit');
 var T = new Twit(require('./config.js'));
 
-//main loop: tweet once an hour
+var CronJob = require('cron').CronJob;
+new CronJob('0 0 * * * *', function() {
+  //tweet once, once an hour
+  searchJust();
+}, null, true, 'America/New_York');
 
 function tweet(sts) {
   T.post('statuses/update', { status: sts }, function(err, data, response) {
