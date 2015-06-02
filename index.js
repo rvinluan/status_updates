@@ -5,13 +5,12 @@ var Twit = require('twit');
 var T = new Twit(require('./config.js'));
 
 var CronJob = require('cron').CronJob;
-new CronJob('*/10 * * * * *', function() {
+new CronJob('00 0,30 * * * *', function() {
   //tweet once, once an hour
   searchJust();
 }, null, true, 'America/New_York');
 
 function tweet(sts) {
-  return;
   T.post('statuses/update', { status: sts }, function(err, data, response) {
     if(err) {
       console.log("There was an err:"+err);
@@ -63,46 +62,35 @@ function searchJust() {
 //searches for tweets of the form 'x is fun'
 //will also use other emotions like awesome or lame in place of fun
 function searchInCase(finalTweet) {
-  var verb = lexicon.randomWord("vbg");
-  console.log("random gerund::"+verb);
   var emotions = [
     'fun', 'lame', 'awesome', 'shitty', 'great',
     'amazing', 'stupid', 'boring', 'eventful',
     'perfect', 'unbelievable', 'ridiculous',
     'intense', 'crazy', 'good', 'exciting', 'sad'
   ];
-  var phrasings = [
-    ", in case you were wondering how {#x} is going",
-    ". I guess that's just how {#x} goes",
-    ". That's {#x} for you",
-    ", which means {#x} is going well",
-    ", so {#x} is not going very well"
-  ];
   var emotion = emotions[Math.floor(Math.random() * emotions.length)];
-  var phrasing = phrasings[Math.floor(Math.random() * phrasings.length)];
-  T.get('search/tweets', { q: verb +" -RT", count: 10 }, function(err, data, response) {
+  T.get('search/tweets', { q: "%22is "+emotion+"%22 -RT", count: 10 }, function(err, data, response) {
     if (handleErrors(err, data)) {return;}
     console.log('\033[91m');  
     var finalag;
     for(var i = 0; i < data.statuses.length; i++) {
       console.log(data.statuses[i].text);
-      var tweetText = data.statuses[i].text;
-      var ag = getActivity(tweetText, verb);
-      // var ag = getAcceptableGrammar(activity);
+      var icyww = data.statuses[i].text;
+      var activity = getActivity(icyww, emotion);
+      var ag = getAcceptableGrammar(activity);
       if (ag) {
         finalag = ag;
         console.log('\033[32mPASS: ' + ag + '\033[91m');
         // break;
       } else {
-        console.log('\033[34m' + "words not found" + '\033[91m');
+        console.log('\033[34m' + activity.words.join(" ") + '\033[91m');
         continue;
       }
     }
     console.log('\033[0m');  
     //we should have the final tweet now
     if(finalag) {
-      phrasing = phrasing.replace("{#x}", finalag);
-      finalTweet += phrasing;
+      finalTweet += ", in case you were wondering how " + finalag + " is going";
     }
     console.log("FINAL TWEET ============================("+finalTweet.length+")!");
     console.log(finalTweet);
@@ -125,32 +113,59 @@ function getOperative(str, verb) {
     return restOfString;
 }
 
-//find the three words after the verb and see if they work.
-function getActivity(tweet, verb) {
+//find the part of the tweet that precedes 'is [emotion]'
+function getActivity(tweet, emotion) {
   var tokens = tweet.toLowerCase().split(" ");
-  var verbIndex, endIndex;
-  var testWord;
-  //find where the verb is.
-  for (var i = 0; i < tokens.length; i++) {
-    if(tokens[i] === verb) {
-      verbIndex = i;
-      break; //find only the first instance, if there are multiple
+  var isIndex = -1;
+  var newPhraseArray = [];
+  var posArray = [];
+  var returnObject = {
+    words: [],
+    pos: []
+  }
+  //loop through and find the 'is [emotion]'
+  for(var i = 0; i < tokens.length; i++) {
+    if( i >= tokens.length - 1) {
+      break; //stop the loop now before even doing the check
     }
-  };
-  //check two words after.
-  testWord = tokens[verbIndex + 2];
-  if(testWord && !lexicon.isNoun(testWord)) {
-    //is the next word a noun?
-    if(tokens[verbIndex + 3] && !lexicon.isNoun(tokens[verbIndex+2])) {
-      endIndex = verbIndex + 1;
-    } else {
-      endIndex = verbIndex + 3;
+    if(
+      tokens[i].indexOf("is") !== -1 &&
+      tokens[i+1].indexOf(emotion) !== -1
+    ) {
+      isIndex = i;
     }
-  } else {
-    endIndex = verbIndex + 2;
   }
 
-  return tokens.slice(verbIndex, endIndex + 1).join(" ");
+  if(isIndex == -1) {
+    return returnObject;
+  }
+
+  //let's look at the 3 words before the "is [emotion]"
+  //some of these will be undefined, that's ok
+  for(var i = 0; i < 3; i++) {
+    var text = tokens[isIndex - (3 - i)];
+    //filter out usernames and links
+    if(!text || text.charAt(0) == '@' || text.indexOf('http') !== -1) {
+      newPhraseArray[i] = new rita.RiString("");
+    } else {    
+      newPhraseArray[i] = new rita.RiString(text);
+    }
+    posArray[i] = newPhraseArray[i].pos()[0];
+  }
+  // console.log('\033[35m');
+  // console.log(newPhraseArray);
+  // console.log(posArray);
+  // console.log('\033[0m');
+
+  var threewordphrase = newPhraseArray.map(function (value, index) {
+    return value._text;
+  })
+
+  //returns the 3 words and their parts of speech
+  return {
+    words: threewordphrase,
+    pos: posArray
+  }
 }
 
 function randomGerund() {
@@ -161,7 +176,7 @@ function randomGerund() {
 //outputs a regex that checks for things that can be considered to be pauses or endings in thought
 function thoughtEndings() {
   return new RegExp(""
-    +"[.?!,;&…]|" //common punctuation
+    +"[.?!,&…]|" //common punctuation
     +"\\n|" //newline
     +"\\s(and|but|so|then|because|therefore)\\s|" //connecting words (with spaces so as not to match 'some' or 'husband')
     +"(\\s[-–—]\\s)|" //hyphen and dashes, but not hyphenated words
