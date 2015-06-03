@@ -75,24 +75,31 @@ function searchInCase(finalTweet) {
     ", in case you were wondering how {#x} is going",
     ". I guess that's just how {#x} goes",
     ". That's {#x} for you",
-    ", which means {#x} is going well",
-    ", so {#x} is not going very well"
+    " while {#x}"
   ];
   var emotion = emotions[Math.floor(Math.random() * emotions.length)];
   var phrasing = phrasings[Math.floor(Math.random() * phrasings.length)];
-  T.get('search/tweets', { q: verb +" -RT", count: 10, language: "en" }, function(err, data, response) {
+  T.get('search/tweets', { q: verb +" -RT", count: 10, lang: "en" }, function(err, data, response) {
     if (handleErrors(err, data)) {return;}
     console.log('\033[91m');  
-    var finalag;
+    var longest = "";
+    var finalag = verb;
     for(var i = 0; i < data.statuses.length; i++) {
-      console.log(data.statuses[i].text);
       var tweetText = data.statuses[i].text;
+      console.log(tweetText);
+      //let's immediately eliminate statuses with links,
+      //because these tend to contain either spam or headlines 
+      //(both of which are not the best examples of grammar)
+      if(tweetText.indexOf("http") !== -1) {
+        break;
+      }
       var ag = getActivity(tweetText, verb);
-      // var ag = getAcceptableGrammar(activity);
       if (ag) {
-        finalag = ag;
-        console.log('\033[32mPASS: ' + ag + '\033[91m');
-        // break;
+        if(ag.length >= longest.length) {
+          finalag = ag;
+          longest = ag;
+        }
+        console.log('\033[32m' + ag + '\033[91m');          
       } else {
         console.log('\033[34m' + "words not found" + '\033[91m');
         continue;
@@ -128,37 +135,33 @@ function getOperative(str, verb) {
 //find the three words after the verb and see if they work.
 function getActivity(tweet, verb) {
   var operative = getOperative(tweet.toLowerCase(), verb);
-  console.log("operative::"+operative)
   var tokens = operative.split(" ");
-  var verbIndex, endIndex;
+  var endIndex;
   var testWord;
-  //find where the verb is.
+  //sanitize everything.
   for (var i = 0; i < tokens.length; i++) {
     tokens[i] = rita.RiTa.stripPunctuation(tokens[i]);
-    if(tokens[i] === verb) {
-      verbIndex = i;
-      break; //find only the first instance, if there are multiple
-    }
   };
+  console.log("stripped-operative::"+tokens.join(" "));
   //check two words after.
-  testWord = tokens[verbIndex + 2];
+  testWord = tokens[2];
   if(testWord && !isANoun(testWord)) {
     //is the next word a noun?
-    if(tokens[verbIndex + 3] && !isANoun(tokens[verbIndex + 3])) {
+    if(tokens[3] && !isANoun(tokens[3])) {
       //okay how about the previous one
-      if(tokens[verbIndex + 1] && !isANoun(tokens[verbIndex + 1])) {
-        endIndex = verbIndex; //just the verb
+      if(tokens[1] && !isANoun(tokens[1])) {
+        endIndex = 0; //just the verb
       } else {
-        endIndex = verbIndex + 1;
+        endIndex = 1;
       }
     } else {
-      endIndex = verbIndex + 3;
+      endIndex = 3;
     }
   } else {
-    endIndex = verbIndex + 2;
+    endIndex = 2;
   }
 
-  return tokens.slice(verbIndex, endIndex + 1).join(" ");
+  return tokens.slice(0, endIndex + 1).join(" ");
 }
 
 //helper function, because lexicon.isNoun() has false positives
@@ -174,7 +177,8 @@ function isANoun(word) {
 //outputs a regex that checks for things that can be considered to be pauses or endings in thought
 function thoughtEndings() {
   return new RegExp(""
-    +"[.?!,;&…\"]|" //common punctuation
+    +"[.?!,;&…/\"]|" //common punctuation
+    +"[=:<]|" //punctuation that is likely to start emoticons
     +"\\n|" //newline
     +"\\s(and|but|so|then|because|therefore)\\s|" //connecting words (with spaces so as not to match 'some' or 'husband')
     +"(\\s[-–—]\\s)|" //hyphen and dashes, but not hyphenated words
