@@ -74,7 +74,6 @@ function searchInCase(finalTweet) {
   var phrasings = [
     ", in case you were wondering how {#x} is going",
     ". I guess that's just how {#x} goes",
-    ". That's {#x} for you",
     " while {#x}"
   ];
   var emotion = emotions[Math.floor(Math.random() * emotions.length)];
@@ -136,29 +135,21 @@ function getOperative(str, verb) {
 function getActivity(tweet, verb) {
   var operative = getOperative(tweet.toLowerCase(), verb);
   var tokens = operative.split(" ");
-  var endIndex;
+  var endIndex = 0;
   var testWord;
   //sanitize everything.
   for (var i = 0; i < tokens.length; i++) {
     tokens[i] = rita.RiTa.stripPunctuation(tokens[i]);
   };
   console.log("stripped-operative::"+tokens.join(" "));
-  //check two words after.
-  testWord = tokens[2];
-  if(testWord && !isANoun(testWord)) {
-    //is the next word a noun?
-    if(tokens[3] && !isANoun(tokens[3])) {
-      //okay how about the previous one
-      if(tokens[1] && !isANoun(tokens[1])) {
-        endIndex = 0; //just the verb
-      } else {
-        endIndex = 1;
-      }
-    } else {
-      endIndex = 3;
+
+
+  //working backwards, find the noun and chop there.
+  for (var j = 3; j >= 0; j--) {
+    if(isANoun(tokens[j])) {
+      endIndex = j;
+      break;
     }
-  } else {
-    endIndex = 2;
   }
 
   return tokens.slice(0, endIndex + 1).join(" ");
@@ -166,6 +157,9 @@ function getActivity(tweet, verb) {
 
 //helper function, because lexicon.isNoun() has false positives
 function isANoun(word) {
+  if(!word) {
+    return false;
+  }
   var ristring = new rita.RiString(word);
   //one exception: the word 'I'
   if(word.toLowerCase() === 'i') {
