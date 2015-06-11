@@ -145,7 +145,7 @@ function getActivity(tweet, verb) {
 
 
   //working backwards, find the noun and chop there.
-  for (var j = 3; j >= 0; j--) {
+  for (var j = tokens.length; j >= 0; j--) {
     if(isANoun(tokens[j])) {
       endIndex = j;
       break;
@@ -153,6 +153,10 @@ function getActivity(tweet, verb) {
   }
 
   return tokens.slice(0, endIndex + 1).join(" ");
+}
+
+function replaceOddPronouns(str) {
+  str.replace(/\s(your|his|her)\s/, "my");
 }
 
 //helper function, because lexicon.isNoun() has false positives
