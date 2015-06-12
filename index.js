@@ -7,7 +7,7 @@ var T = new Twit(require('./config.js'));
 var CronJob = require('cron').CronJob;
 new CronJob('*/10 * * * * *', function() {
   //tweet once, once an hour
-  searchJust();
+  searchPart1();
 }, null, true, 'America/New_York');
 
 function tweet(sts) {
@@ -19,30 +19,40 @@ function tweet(sts) {
   })
 }
 
-function handleErrors(err, data) {
+function handleErrors(err, data, callback) {
   if(err) {
     console.log("There was an err:"+err);
     return 1;
   }
   if(!data || !data.statuses || data.statuses.length == 0) { 
     console.log("No tweets found for chosen verb.");
+    if(callback) {
+      callback();
+    }
     return 2; 
   }
   return 0;
 }
 
+//some extra parameters for search:
+//--no retweets
+//--don't use your own tweets (duh)
+function buildSearchQuery(str) {
+  return str + " -RT -from:justdidathing";
+}
+
 //the 'I Just...' part
-function searchJust() {
-  var finalTweet = "I just ";
+function searchPart1() {
+  var tweetBody = "I just ";
   var verb = lexicon.randomWord("vbd");
   console.log("verb::"+verb);
-  var query = ("%22I just " + verb + "%22");
+  var query = buildSearchQuery("I just "+verb);
   T.get('search/tweets', { q: query, count: 1 }, function(err, data, response) {
-    if (handleErrors(err, data) == 2) {
-      searchJust();
+    
+    if( handleErrors(err, data, searchPart1) ) {
       return;
     }
-    if (handleErrors(err, data)) {return;}
+
     for(var i = 0; i < data.statuses.length; i++) {
       var text = data.statuses[i].text;
       var op = getOperative(text.toLowerCase(), verb.toLowerCase());
@@ -53,32 +63,58 @@ function searchJust() {
       if(op.charAt(op.length - 1) == " ") {
         op = op.slice(0, -1);
       }
-      finalTweet += op;
-      //the 'in case you were wondering part'
-      var icyww = searchInCase(finalTweet);
+      tweetBody += op;
+      //do the 2nd part
+      if(Math.random() > 0.3) {
+        searchPart2_Verb(tweetBody);
+      } else {
+        searchPart2_Noun(tweetBody);
+      }
     }
   })
 }
 
 //searches for tweets of the form 'x is fun'
 //will also use other emotions like awesome or lame in place of fun
-function searchInCase(finalTweet) {
-  var verb = lexicon.randomWord("vbg");
-  console.log("random gerund::"+verb);
+function searchPart2_Noun(tweetBody) {
   var emotions = [
     'fun', 'lame', 'awesome', 'shitty', 'great',
     'amazing', 'stupid', 'boring', 'eventful',
     'perfect', 'unbelievable', 'ridiculous',
     'intense', 'crazy', 'good', 'exciting', 'sad'
   ];
-  var phrasings = [
-    ", in case you were wondering how {#x} is going",
-    ". I guess that's just how {#x} goes",
-    " while {#x}"
-  ];
   var emotion = emotions[Math.floor(Math.random() * emotions.length)];
-  var phrasing = phrasings[Math.floor(Math.random() * phrasings.length)];
-  T.get('search/tweets', { q: verb +" -RT", count: 10, lang: "en" }, function(err, data, response) {
+  var query = buildSearchQuery("%22is "+emotion+"%22");
+  var rest = "";
+
+  console.log("searching for a noun that::'"+emotion+"'");
+  T.get('search/tweets', { q: query, count: 10, lang: "en" }, function(err, data, response) {
+    if (handleErrors(err, data)) { return; }
+    console.log('\033[91m');  
+    for(var i = 0; i < data.statuses.length; i++) {
+      var tweetText = data.statuses[i].text;
+      var np = getNounPhrase(tweetText, emotion);
+      console.log(tweetText);
+      if(np) {
+        console.log("\033[32mgood noun phrase::"+np+"\033[91m");
+        rest = np;
+      } else {
+        console.log("\033[33munnacepted noun phrase\033[91m");
+      }
+    }
+    console.log('\033[0m');
+
+    putItTogether(tweetBody, replaceOddPronouns(rest));
+  });
+}
+
+//searches for tweets for random gerunds
+//will also use other emotions like awesome or lame in place of fun
+function searchPart2_Verb(tweetBody) {
+  var verb = lexicon.randomWord("vbg");
+  console.log("searching with a random gerund::"+verb);
+  var query = buildSearchQuery(verb);
+  T.get('search/tweets', { q: query, count: 10, lang: "en" }, function(err, data, response) {
     if (handleErrors(err, data)) {return;}
     console.log('\033[91m');  
     var longest = "";
@@ -90,7 +126,8 @@ function searchInCase(finalTweet) {
       //because these tend to contain either spam or headlines 
       //(both of which are not the best examples of grammar)
       if(tweetText.indexOf("http") !== -1) {
-        break;
+        console.log("\033[34mlink detected. Skipping.\033[91m")
+        continue;
       }
       var ag = getActivity(tweetText, verb);
       if (ag) {
@@ -100,20 +137,36 @@ function searchInCase(finalTweet) {
         }
         console.log('\033[32m' + ag + '\033[91m');          
       } else {
-        console.log('\033[34m' + "words not found" + '\033[91m');
+        console.log('\033[33m' + "words not found" + '\033[91m');
         continue;
       }
     }
-    console.log('\033[0m');  
-    //we should have the final tweet now
-    if(finalag) {
-      phrasing = phrasing.replace("{#x}", finalag);
-      finalTweet += phrasing;
-    }
-    console.log("FINAL TWEET ============================("+finalTweet.length+")!");
-    console.log(finalTweet);
-    tweet(finalTweet);
+    console.log('\033[0m');
+    putItTogether(tweetBody, replaceOddPronouns(finalag), 
+      [" while {#x}",
+      ". That's what I get for {#x}"]
+    ); 
   });
+}
+
+function putItTogether(tweetBody, rest, extraPhrases) {
+  var phrasings = [
+    ", in case you were wondering how {#x} is going",
+    ", which does not bode well for {#x}",
+    ", which is not good for {#x}",
+    ", so {#x} is going to be weird",
+  ];
+  phrasings = phrasings.concat(extraPhrases);
+  var phrasing = phrasings[Math.floor(Math.random() * phrasings.length)];
+
+  if(rest) {
+    phrasing = phrasing.replace("{#x}", rest);
+    tweetBody += phrasing;
+  }
+  console.log("FINAL TWEET ============================("+tweetBody.length+")!");
+  console.log(tweetBody);
+  tweet(tweetBody);
+
 }
 
 //find the part of a tweet that follows 'I just [verbed]' or '[verbing]'
@@ -131,18 +184,14 @@ function getOperative(str, verb) {
     return restOfString;
 }
 
-//find the three words after the verb and see if they work.
+//find the words after a gerund and see if they work.
 function getActivity(tweet, verb) {
   var operative = getOperative(tweet.toLowerCase(), verb);
-  var tokens = operative.split(" ");
+  var tokens = sanitize(operative.split(" "));
   var endIndex = 0;
   var testWord;
-  //sanitize everything.
-  for (var i = 0; i < tokens.length; i++) {
-    tokens[i] = rita.RiTa.stripPunctuation(tokens[i]);
-  };
-  console.log("stripped-operative::"+tokens.join(" "));
 
+  console.log("stripped-operative::"+tokens.join(" "));
 
   //working backwards, find the noun and chop there.
   for (var j = tokens.length; j >= 0; j--) {
@@ -155,8 +204,43 @@ function getActivity(tweet, verb) {
   return tokens.slice(0, endIndex + 1).join(" ");
 }
 
+function getNounPhrase(tweet, emotion) {
+  var tokens = sanitize(tweet.split(" "));
+  var startIndex = -1;
+
+  //find the emotion
+  for(var i = 0; i < tokens.length; i++) {
+    if(tokens[i] === emotion) {
+      //set the phrase to start 3 words behind the 'is [emotion]'
+      if(i < 4) {
+        i = 0;
+      } else {
+        startIndex = i - 4;
+      }
+      break;
+    }
+  }
+
+  if(startIndex < 0) {
+    return "";
+  }
+  
+  var threeWordPhrase = tokens.slice(startIndex, startIndex+3);
+  console.log("raw phrase::"+threeWordPhrase.join(" "));
+  return getAcceptableGrammar(threeWordPhrase);
+}
+
 function replaceOddPronouns(str) {
-  str.replace(/\s(your|his|her)\s/, "my");
+  return str.replace(/\s(your|his|her|their)\s/, "my");
+}
+
+function sanitize(tokensArray) {
+  //removes punctuation
+  for (var i = 0; i < tokensArray.length; i++) {
+    tokensArray[i] = rita.RiTa.stripPunctuation(tokensArray[i].toLowerCase());
+  };
+
+  return tokensArray;
 }
 
 //helper function, because lexicon.isNoun() has false positives
@@ -187,12 +271,10 @@ function thoughtEndings() {
 
 //use the parts of speec of the words to see if they would make sense
 //when inserted into the form 'how X is going'
-function getAcceptableGrammar(activity) {
-  var posArray = activity.pos;
-      wordsArray = activity.words;
-  if (!posArray) {
-    throw new Error("couldn't find the is [emotion] in the tweet.");
-  };
+function getAcceptableGrammar(threeWordPhrase) {
+  var posArray = threeWordPhrase.map(function (elem) {
+    return new rita.RiString(elem).pos(); 
+  })
   var acceptable3words = [
     ['vbg', '*', 'nn'], //gerund + noun (being a dog, making my bed)
     ['vbg', '*', 'nns'], //plural
@@ -219,7 +301,7 @@ function getAcceptableGrammar(activity) {
       else { passes[j] = false; }
     }
     if ( passes[0] && passes[1] && passes[2] ) {
-      return activity.words.join(" ");
+      return threeWordPhrase.join(" ");
     } else {
       passes[0] = false;
       passes[1] = false;
@@ -238,13 +320,9 @@ function getAcceptableGrammar(activity) {
       else { passes[j] = false; }
     }
     if( passes[1] && passes[2] ) {
-      return wordsArray[1] + " " + wordsArray[2];
+      return threeWordPhrase.slice(1,3).join(" ");
     }
   }
   //no phrases passed.
-  //last ditch effort:
-  if(posArray[2] === "vbg") {
-    return wordsArray[2];
-  }
   return "";
 }
