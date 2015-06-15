@@ -229,7 +229,7 @@ function getNounPhrase(tweet, emotion) {
 }
 
 function replaceOddPronouns(str) {
-  return str.replace(/\s(your|his|her|their)\s/, "my");
+  return str.replace(/\s(your|his|her|their)\s/, " my ");
 }
 
 function sanitize(tokensArray) {
@@ -319,7 +319,7 @@ function thoughtEndings() {
     "[.?!,;&…/\"]" //common punctuation
     ,"[=:<]" //punctuation that is likely to start emoticons
     ,"\\n" //newline
-    ,"\\s(and|but|so|then|because|therefore)\\s" //connecting words (with spaces so as not to match 'some' or 'husband')
+    ,"\\s(and|but|or|so|then|because|therefore)\\s" //connecting words (with spaces so as not to match 'some' or 'husband')
     ,"(\\s[-–—]\\s)" //hyphen and dashes, but not hyphenated words
     ,"(http)" //a url
     ,"@[a-zA-Z\\d_]+" //a twitter handle
