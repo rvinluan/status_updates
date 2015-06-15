@@ -104,7 +104,7 @@ function searchPart2_Noun(tweetBody) {
     }
     console.log('\033[0m');
 
-    putItTogether(tweetBody, replaceOddPronouns(rest));
+    putItTogether(tweetBody, replaceOddPronouns(rest), []);
   });
 }
 
@@ -143,7 +143,8 @@ function searchPart2_Verb(tweetBody) {
     console.log('\033[0m');
     putItTogether(tweetBody, replaceOddPronouns(finalag), 
       [" while {#x}",
-      ". That's what I get for {#x}"]
+      ". That's what I get for {#x}",
+      ", all because I was {#x}"]
     ); 
   });
 }
@@ -152,8 +153,14 @@ function putItTogether(tweetBody, rest, extraPhrases) {
   var phrasings = [
     ", in case you were wondering how {#x} is going",
     ", which does not bode well for {#x}",
+    ", which bodes well for {#x}",
     ", which is not good for {#x}",
+    ", which is great for {#x}",
     ", so {#x} is going to be weird",
+    ", so {#x} is going to be fun",
+    ", so {#x} is going to be awesome",
+    ", so {#x} is going to be lame",
+    ". All because of {#x}"
   ].concat(extraPhrases);
   var phrasing = phrasings[Math.floor(Math.random() * phrasings.length)];
 
@@ -229,7 +236,8 @@ function getNounPhrase(tweet, emotion) {
 }
 
 function replaceOddPronouns(str) {
-  return str.replace(/\s(your|his|her|their)\s/, " my ");
+  var newstr = str.replace(/(\s|^)(your|his|her|their)\s/i, " my ");
+  return newstr.charAt(0) === " " ? newstr.substring(1) : newstr ;
 }
 
 function sanitize(tokensArray) {
@@ -297,7 +305,10 @@ function removeTrailingExclamations(str) {
     "omg",
     "omfg",
     "wow",
-    "jfc"
+    "jfc",
+    "oops",
+    "smh",
+    "smdh"
   ];
   var exsToRemove = 0;
   var tokens = str.split(" ");
@@ -319,7 +330,7 @@ function thoughtEndings() {
     "[.?!,;&…/\"]" //common punctuation
     ,"[=:<]" //punctuation that is likely to start emoticons
     ,"\\n" //newline
-    ,"\\s(and|but|or|so|then|because|therefore)\\s" //connecting words (with spaces so as not to match 'some' or 'husband')
+    ,"\\s(and|but|or|so|then|because|therefore|n)\\s" //connecting words (with spaces so as not to match 'some' or 'husband')
     ,"(\\s[-–—]\\s)" //hyphen and dashes, but not hyphenated words
     ,"(http)" //a url
     ,"@[a-zA-Z\\d_]+" //a twitter handle
