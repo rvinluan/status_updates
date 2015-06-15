@@ -46,7 +46,7 @@ function searchPart1() {
   var tweetBody = "I just ";
   var verb = lexicon.randomWord("vbd");
   console.log("verb::"+verb);
-  var query = buildSearchQuery("I just "+verb);
+  var query = buildSearchQuery("%22I just "+verb+"%22");
   T.get('search/tweets', { q: query, count: 1 }, function(err, data, response) {
     
     if( handleErrors(err, data, searchPart1) ) {
@@ -63,7 +63,7 @@ function searchPart1() {
       if(op.charAt(op.length - 1) == " ") {
         op = op.slice(0, -1);
       }
-      tweetBody += op;
+      tweetBody = removeTrailingExclamations(removeTrailingPrepostions(tweetBody + op));
       //do the 2nd part
       if(Math.random() > 0.3) {
         searchPart2_Verb(tweetBody);
@@ -109,7 +109,6 @@ function searchPart2_Noun(tweetBody) {
 }
 
 //searches for tweets for random gerunds
-//will also use other emotions like awesome or lame in place of fun
 function searchPart2_Verb(tweetBody) {
   var verb = lexicon.randomWord("vbg");
   console.log("searching with a random gerund::"+verb);
@@ -117,7 +116,7 @@ function searchPart2_Verb(tweetBody) {
   T.get('search/tweets', { q: query, count: 10, lang: "en" }, function(err, data, response) {
     if (handleErrors(err, data)) {return;}
     console.log('\033[91m');  
-    var longest = "";
+    var bestScore = "";
     var finalag = verb;
     for(var i = 0; i < data.statuses.length; i++) {
       var tweetText = data.statuses[i].text;
@@ -131,9 +130,9 @@ function searchPart2_Verb(tweetBody) {
       }
       var ag = getActivity(tweetText, verb);
       if (ag) {
-        if(ag.length >= longest.length) {
+        if(verbPhraseScore(ag) >= verbPhraseScore(bestScore)) {
           finalag = ag;
-          longest = ag;
+          bestScore = ag;
         }
         console.log('\033[32m' + ag + '\033[91m');          
       } else {
@@ -155,8 +154,7 @@ function putItTogether(tweetBody, rest, extraPhrases) {
     ", which does not bode well for {#x}",
     ", which is not good for {#x}",
     ", so {#x} is going to be weird",
-  ];
-  phrasings = phrasings.concat(extraPhrases);
+  ].concat(extraPhrases);
   var phrasing = phrasings[Math.floor(Math.random() * phrasings.length)];
 
   if(rest) {
@@ -256,17 +254,79 @@ function isANoun(word) {
   return lexicon.isNoun(word) && ristring.pos().indexOf("nn") !== -1;
 }
 
+//pick better verb phrases.
+//right now it just optimizes for phrases that are 3 or 4 words.
+function verbPhraseScore(phrase) {
+  var tokens = phrase.split(" ");
+  if(tokens.length == 3 || tokens.length == 4) {
+    return 100;
+  } else if(tokens.length > 4) {
+    return 75;
+  } else if(tokens.length == 2) {
+    return 50;
+  } else {
+    return 0;
+  }
+}
+
+//you're not supposed to end a sentence with a preposition, right?
+//this also removes possessive pronouns, because they should be followed by something.
+function removeTrailingPrepostions(str) {
+  var prepsToRemove = 0;
+  var tokens = str.split(" ");
+  var pos;
+  for(var i = tokens.length - 1; i >= 0; i--) {
+    pos = new rita.RiString(tokens[i]).pos();
+    if( pos[0] === "in" || pos[0] === "to" || pos[0] === "prp$") {
+      prepsToRemove++;
+    } else {
+      break;
+    }
+  }
+
+  return tokens.slice(0, tokens.length - prepsToRemove).join(" ");
+}
+
+//a lot of times people will add some qualifier,
+//we want to get rid of those because Rita thinks they're nouns
+function removeTrailingExclamations(str) {
+  var exclamations = [
+    "lmfao",
+    "lmao",
+    "lol",
+    "omg",
+    "omfg",
+    "wow",
+    "jfc"
+  ];
+  var exsToRemove = 0;
+  var tokens = str.split(" ");
+  var pos;
+  for(var i = tokens.length - 1; i >= 0; i--) {
+    if(exclamations.indexOf(tokens[i]) !== -1) {
+      exsToRemove++;
+    } else {
+      break;
+    }
+  }
+
+  return tokens.slice(0, tokens.length - exsToRemove).join(" ");
+}
+
 //outputs a regex that checks for things that can be considered to be pauses or endings in thought
 function thoughtEndings() {
-  return new RegExp(""
-    +"[.?!,;&…/\"]|" //common punctuation
-    +"[=:<]|" //punctuation that is likely to start emoticons
-    +"\\n|" //newline
-    +"\\s(and|but|so|then|because|therefore)\\s|" //connecting words (with spaces so as not to match 'some' or 'husband')
-    +"(\\s[-–—]\\s)|" //hyphen and dashes, but not hyphenated words
-    +"(http)|" //a url
-    +"@[a-zA-Z\\d_]+" //a twitter handle
-  ,'i')
+  var endings = [
+    "[.?!,;&…/\"]" //common punctuation
+    ,"[=:<]" //punctuation that is likely to start emoticons
+    ,"\\n" //newline
+    ,"\\s(and|but|so|then|because|therefore)\\s" //connecting words (with spaces so as not to match 'some' or 'husband')
+    ,"(\\s[-–—]\\s)" //hyphen and dashes, but not hyphenated words
+    ,"(http)" //a url
+    ,"@[a-zA-Z\\d_]+" //a twitter handle
+    ,"(i|i'm|i'll)\\s" //first person words, which usually signal a run on sentence
+  ];
+
+  return new RegExp(endings.join("|"),"i");
 }
 
 //use the parts of speec of the words to see if they would make sense
