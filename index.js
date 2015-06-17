@@ -74,16 +74,20 @@ function searchPart1() {
   })
 }
 
-//searches for tweets of the form 'x is fun'
-//will also use other emotions like awesome or lame in place of fun
-function searchPart2_Noun(tweetBody) {
+function getRandomEmotion() {
   var emotions = [
     'fun', 'lame', 'awesome', 'shitty', 'great',
     'amazing', 'stupid', 'boring', 'eventful',
     'perfect', 'unbelievable', 'ridiculous',
     'intense', 'crazy', 'good', 'exciting', 'sad'
   ];
-  var emotion = emotions[Math.floor(Math.random() * emotions.length)];
+  return emotions[Math.floor(Math.random() * emotions.length)];
+}
+
+//searches for tweets of the form 'x is fun'
+//will also use other emotions like awesome or lame in place of fun
+function searchPart2_Noun(tweetBody) {
+  var emotion = getRandomEmotion();
   var query = buildSearchQuery("%22is "+emotion+"%22");
   var rest = "";
 
@@ -144,7 +148,8 @@ function searchPart2_Verb(tweetBody) {
     putItTogether(tweetBody, replaceOddPronouns(finalag), 
       [" while {#x}",
       ". That's what I get for {#x}",
-      ", all because I was {#x}"]
+      ", all because I was {#x}",
+      ". Also I'm {#x}"]
     ); 
   });
 }
@@ -152,20 +157,14 @@ function searchPart2_Verb(tweetBody) {
 function putItTogether(tweetBody, rest, extraPhrases) {
   var phrasings = [
     ", in case you were wondering how {#x} is going",
-    ", which does not bode well for {#x}",
-    ", which bodes well for {#x}",
-    ", which is not good for {#x}",
-    ", which is great for {#x}",
-    ", so {#x} is going to be weird",
-    ", so {#x} is going to be fun",
-    ", so {#x} is going to be awesome",
-    ", so {#x} is going to be lame",
-    ". All because of {#x}"
+    ". All because of {#x}",
+    ", so {#x} is going to be {#y}",
+    ", which is {#y} for {#x}"
   ].concat(extraPhrases);
   var phrasing = phrasings[Math.floor(Math.random() * phrasings.length)];
 
   if(rest) {
-    phrasing = phrasing.replace("{#x}", rest);
+    phrasing = phrasing.replace("{#x}", rest).replace("{#y}", getRandomEmotion());
     tweetBody += phrasing;
   }
   console.log("FINAL TWEET ============================("+tweetBody.length+")!");
