@@ -5,7 +5,7 @@ var Twit = require('twit');
 var T = new Twit(require('./config.js'));
 
 var CronJob = require('cron').CronJob;
-new CronJob('0 */5 * * * *', function() {
+new CronJob('*/10 * * * * *', function() {
   //tweet once, once an hour
   searchPart1();
 }, null, true, 'America/New_York');
@@ -76,7 +76,7 @@ function searchPart1() {
 function getRandomEmotion() {
   var emotions = [
     'fun', 'lame', 'awesome', 'shitty', 'great',
-    'amazing', 'stupid', 'boring', 'eventful',
+    'amazing', 'stupid', 'boring', 'rad',
     'perfect', 'unbelievable', 'ridiculous',
     'intense', 'crazy', 'good', 'exciting', 'sad'
   ];
@@ -158,7 +158,9 @@ function putItTogether(tweetBody, rest, extraPhrases) {
     ", in case you were wondering how {#x} is going",
     ". All because of {#x}",
     ", so {#x} is going to be {#y}",
-    ", which is {#y} for {#x}"
+    ". {#x} is {#y}",
+    ", which is {#y} for {#x}",
+    ". That's what's {#y} about {#x}",
   ].concat(extraPhrases);
   var phrasing = phrasings[Math.floor(Math.random() * phrasings.length)];
 
@@ -338,7 +340,7 @@ function thoughtEndings() {
   return new RegExp(endings.join("|"),"i");
 }
 
-//use the parts of speec of the words to see if they would make sense
+//use the parts of speech of the words to see if they would make sense
 //when inserted into the form 'how X is going'
 function getAcceptableGrammar(threeWordPhrase) {
   var posArray = threeWordPhrase.map(function (elem) {
