@@ -5,7 +5,7 @@ var Twit = require('twit');
 var T = new Twit(require('./config.js'));
 
 var CronJob = require('cron').CronJob;
-new CronJob('0 */20 * * * *', function() {
+new CronJob('*/10 * * * * *', function() {
   //tweet once, once an hour
   searchPart1();
 }, null, true, 'America/New_York');
@@ -64,10 +64,10 @@ function searchPart1() {
       }
       tweetBody = removeTrailingExclamations(removeTrailingPrepostions(tweetBody + op));
       //do the 2nd part
-      if(Math.random() > 0.3) {
-        searchPart2_Verb(tweetBody);
-      } else {
+      if(Math.random() > 0.4) {
         searchPart2_Noun(tweetBody);
+      } else {
+        searchPart2_Verb(tweetBody);
       }
     }
   })
@@ -170,7 +170,7 @@ function putItTogether(tweetBody, rest, extraPhrases) {
   }
   console.log("FINAL TWEET ============================("+tweetBody.length+")!");
   console.log(tweetBody);
-  tweet(tweetBody);
+  //tweet(tweetBody);
 
 }
 
@@ -285,7 +285,7 @@ function removeTrailingPrepostions(str) {
   var pos;
   for(var i = tokens.length - 1; i >= 0; i--) {
     pos = new rita.RiString(tokens[i]).pos();
-    if( pos[0] === "in" || pos[0] === "to" || pos[0] === "prp$") {
+    if( pos[0] === "in" || pos[0] === "to" || pos[0] === "prp$" || pos[0] === "dt") {
       prepsToRemove++;
     } else {
       break;
@@ -330,6 +330,7 @@ function thoughtEndings() {
     "[.?!,;&…/\"]" //common punctuation
     ,"[=:<]" //punctuation that is likely to start emoticons
     ,"\\n" //newline
+    ,"\\s{2,}" //multiple spaces in a row
     ,"\\s(and|but|or|so|then|because|therefore|n)\\s" //connecting words (with spaces so as not to match 'some' or 'husband')
     ,"(\\s[-–—]\\s)" //hyphen and dashes, but not hyphenated words
     ,"(http)" //a url
@@ -347,7 +348,9 @@ function getAcceptableGrammar(threeWordPhrase) {
     return new rita.RiString(elem).pos(); 
   })
   var acceptable3words = [
-    ['vbg', '*', 'nn'], //gerund + noun (being a dog, making my bed)
+    ['vbg', 'dt', 'nn'], //gerund + noun (being a dog, making my bed)
+    ['vbg', 'jj', 'nn'], //list all possibilities except "gerund noun noun"
+    ['vbg', 'prp$', 'nn'], 
     ['vbg', '*', 'nns'], //plural
     ['prp$', '*', 'nn'], //possessive + noun (my best friend, your winged eyeliner)
     ['prp$', '*', 'nns'], //plural
