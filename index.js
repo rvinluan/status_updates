@@ -209,28 +209,32 @@ function getActivity(tweet, verb) {
   return tokens.slice(0, endIndex + 1).join(" ");
 }
 
+//find the 3 words before 'is [emotion]' and return them if they match acceptable grammar.
+//returns a string, empty if the grammar didn't match or the phrase was too short.
 function getNounPhrase(tweet, emotion) {
-  var tokens = sanitize(tweet.split(" "));
-  var startIndex = -1;
+  var emotionIndex = tweet.toLowerCase().indexOf("is "+emotion)-1);
+  if(emotionIndex < 0)
+    return "";
+  
+  var relevantSubstring = tweet.substring(0, emotionIndex);
+  var tokens = sanitize(relevantSubstring.split(" "));
+  var startIndex = 0;
 
-  //find the emotion
-  for(var i = 0; i < tokens.length; i++) {
-    if(tokens[i] === emotion) {
-      //set the phrase to start 3 words behind the 'is [emotion]'
-      if(i < 4) {
-        i = 0;
-      } else {
-        startIndex = i - 4;
-      }
+  //working backwards...
+  for(var i = tokens.length; i >= 0; i--) {
+    //stop at punctuation
+    if( tokens[i].search(/[!.,;:–—@]/i) !== -1 ) {
+      startIndex = i+1;
+      break;
+    }
+    //or if we have 4 words already
+    else if(i <= tokens.length - 4) {
+      startIndex = i;
       break;
     }
   }
-
-  if(startIndex < 0) {
-    return "";
-  }
   
-  var threeWordPhrase = tokens.slice(startIndex, startIndex+3);
+  var rawVerbPhase = tokens.slice(startIndex);
   console.log("raw phrase::"+threeWordPhrase.join(" "));
   return getAcceptableGrammar(threeWordPhrase);
 }
