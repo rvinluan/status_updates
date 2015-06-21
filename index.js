@@ -347,7 +347,8 @@ function removeTrailingExclamations(str) {
 //outputs a regex that checks for things that can be considered to be pauses or endings in thought
 function thoughtEndings() {
   var endings = [
-    "[.?!,;&…/\"]" //common punctuation
+    "[.?!,;&…/]" //common punctuation
+    ,"[\"\)\}\]]" //brackets quotes and parens
     ,"[=:<]" //punctuation that is likely to start emoticons
     ,"\\n" //newline
     ,"\\s{2,}" //multiple spaces in a row
