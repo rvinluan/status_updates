@@ -5,7 +5,7 @@ var Twit = require('twit');
 var T = new Twit(require('./config.js'));
 
 var CronJob = require('cron').CronJob;
-new CronJob('*/10 * * * * *', function() {
+new CronJob('0 */20 * * * *', function() {
   //tweet once, once an hour
   searchPart1();
 }, null, true, 'America/New_York');
@@ -64,7 +64,7 @@ function searchPart1() {
       }
       tweetBody = removeTrailingExclamations(removeTrailingPrepostions(tweetBody + op));
       //do the 2nd part
-      if(Math.random() > 0.4) {
+      if(Math.random() > 0.5) {
         searchPart2_Noun(tweetBody);
       } else {
         searchPart2_Verb(tweetBody);
@@ -88,26 +88,34 @@ function getRandomEmotion() {
 function searchPart2_Noun(tweetBody) {
   var emotion = getRandomEmotion();
   var query = buildSearchQuery("%22is "+emotion+"%22");
-  var rest = "";
 
-  console.log("searching for a noun that::'"+emotion+"'");
+  console.log("searching for a noun that is::'"+emotion+"'");
   T.get('search/tweets', { q: query, count: 10, lang: "en" }, function(err, data, response) {
+    
     if (handleErrors(err, data)) { return; }
+    
+    var longest = "";
+    var finalChoice = "";
     console.log('\033[91m');  
     for(var i = 0; i < data.statuses.length; i++) {
       var tweetText = data.statuses[i].text;
-      var np = getNounPhrase(tweetText, emotion);
       console.log(tweetText);
+      var np = getNounPhrase(tweetText, emotion);
       if(np) {
         console.log("\033[32mgood noun phrase::"+np+"\033[91m");
-        rest = np;
+        if(np.length > longest.length) {
+          finalChoice = np;
+          longest = np;
+        } else {
+
+        }
       } else {
         console.log("\033[33munnacepted noun phrase\033[91m");
       }
     }
     console.log('\033[0m');
 
-    putItTogether(tweetBody, replaceOddPronouns(rest), []);
+    putItTogether(tweetBody, replaceOddPronouns(finalChoice), []);
   });
 }
 
@@ -117,10 +125,12 @@ function searchPart2_Verb(tweetBody) {
   console.log("searching with a random gerund::"+verb);
   var query = buildSearchQuery(verb);
   T.get('search/tweets', { q: query, count: 10, lang: "en" }, function(err, data, response) {
+    
     if (handleErrors(err, data)) {return;}
+    
     console.log('\033[91m');  
-    var bestScore = "";
-    var finalag = verb;
+    var longest = "";
+    var finalChoice = verb;
     for(var i = 0; i < data.statuses.length; i++) {
       var tweetText = data.statuses[i].text;
       console.log(tweetText);
@@ -131,20 +141,20 @@ function searchPart2_Verb(tweetBody) {
         console.log("\033[34mlink detected. Skipping.\033[91m")
         continue;
       }
-      var ag = getActivity(tweetText, verb);
-      if (ag) {
-        if(verbPhraseScore(ag) >= verbPhraseScore(bestScore)) {
-          finalag = ag;
-          bestScore = ag;
+      var vp = getVerbPhrase(tweetText, verb);
+      if (vp) {
+        if(vp.length > longest.length) {
+          finalChoice = vp;
+          longest = vp;
         }
-        console.log('\033[32m' + ag + '\033[91m');          
+        console.log('\033[32m' + vp + '\033[91m');          
       } else {
         console.log('\033[33m' + "words not found" + '\033[91m');
         continue;
       }
     }
     console.log('\033[0m');
-    putItTogether(tweetBody, replaceOddPronouns(finalag), 
+    putItTogether(tweetBody, replaceOddPronouns(finalChoice), 
       [" while {#x}",
       ". That's what I get for {#x}",
       ", all because I was {#x}",
@@ -170,8 +180,7 @@ function putItTogether(tweetBody, rest, extraPhrases) {
   }
   console.log("FINAL TWEET ============================("+tweetBody.length+")!");
   console.log(tweetBody);
-  //tweet(tweetBody);
-
+  tweet(tweetBody);
 }
 
 //find the part of a tweet that follows 'I just [verbed]' or '[verbing]'
@@ -189,39 +198,33 @@ function getOperative(str, verb) {
     return restOfString;
 }
 
-//find the words after a gerund and see if they work.
-function getActivity(tweet, verb) {
+//find the words after a gerund and match against acceptable phrases.
+function getVerbPhrase(tweet, verb) {
   var operative = getOperative(tweet.toLowerCase(), verb);
   var tokens = sanitize(operative.split(" "));
-  var endIndex = 0;
-  var testWord;
 
-  console.log("stripped-operative::"+tokens.join(" "));
+  console.log("raw-phrase::"+tokens.join(" "));
 
-  //working backwards, find the noun and chop there.
-  for (var j = tokens.length; j >= 0; j--) {
-    if(isANoun(tokens[j])) {
-      endIndex = j;
-      break;
-    }
+  if(tokens.length > 4) {
+    return getAcceptableGrammar(tokens.slice(0, 4));
+  } else {
+    return getAcceptableGrammar(tokens);
   }
-
-  return tokens.slice(0, endIndex + 1).join(" ");
 }
 
-//find the 3 words before 'is [emotion]' and return them if they match acceptable grammar.
-//returns a string, empty if the grammar didn't match or the phrase was too short.
+//find the (up to) 4 words before 'is [emotion]' and return them if they match acceptable grammar.
+//returns a string, empty if the grammar didn't match.
 function getNounPhrase(tweet, emotion) {
-  var emotionIndex = tweet.toLowerCase().indexOf("is "+emotion)-1);
+  var emotionIndex = tweet.toLowerCase().indexOf(("is "+emotion)) - 1;
   if(emotionIndex < 0)
     return "";
   
   var relevantSubstring = tweet.substring(0, emotionIndex);
-  var tokens = sanitize(relevantSubstring.split(" "));
+  var tokens = relevantSubstring.split(" ");
   var startIndex = 0;
 
   //working backwards...
-  for(var i = tokens.length; i >= 0; i--) {
+  for(var i = tokens.length - 1; i >= 0; i--) {
     //stop at punctuation
     if( tokens[i].search(/[!.,;:–—@]/i) !== -1 ) {
       startIndex = i+1;
@@ -234,9 +237,9 @@ function getNounPhrase(tweet, emotion) {
     }
   }
   
-  var rawVerbPhase = tokens.slice(startIndex);
-  console.log("raw phrase::"+threeWordPhrase.join(" "));
-  return getAcceptableGrammar(threeWordPhrase);
+  var rawVerbPhrase = sanitize(tokens.slice(startIndex));
+  console.log("raw phrase::"+rawVerbPhrase.join(" "));
+  return getAcceptableGrammar(rawVerbPhrase);
 }
 
 function replaceOddPronouns(str) {
@@ -345,62 +348,84 @@ function thoughtEndings() {
   return new RegExp(endings.join("|"),"i");
 }
 
+//list of acceptable phrases
+function getAcceptablePOSSequences(numWords) {
+  var sequences = {
+    0: [], //this shouldn't happen
+    1: [
+      ['nn'],
+      ['nns'],
+      ['vbg']
+    ],
+    2: [
+      ['prp$', 'nn'], //my day
+      ['prp$', 'nns'], //our cars
+      ['dt', 'nn'], //the night
+      ['dt', 'nns'], //the things
+      ['vbg', 'nn'], //making love
+      ['vbg', 'nns'], //taking pictures
+      ['prp$', 'vbg'], //my driving
+      ['dt', 'vbg'] //the painting
+    ],
+    3: [
+      ['vbg', 'dt', 'nn'], //being a dog
+      ['vbg', 'jj', 'nns'], //eating tasty pancakes
+      ['vbg', 'nn', 'nns'], //wearing leather boots
+      ['vbg', 'prp$', 'nn'], //making my bed
+      ['vbg', 'prp$', 'nns'], //cleaning his shirts
+      ['vbg', 'in', 'nns'], //cleaning under cars
+      ['vbg', 'in', 'prp'], //teaming with him
+      ['prp$', 'jjs', 'nn'], //my best friend
+      ['prp$', 'jj', 'nn'], //your black eyeliner
+      ['prp$', 'jjs', 'nns'], //plural
+      ['prp$', 'jj', 'nns'],
+      ['prp$', 'nn', 'nns'],
+      ['dt', 'jj', 'nn'], //the united states
+      ['dt', 'jjs', 'nns'],
+      ['dt', 'nn', 'nns']
+    ],
+    4: [
+      ['vbg', 'dt', 'jj', 'nn'], //being an insensitive prick
+      ['vbg', 'dt', 'jj', 'nns'], //lifting the heavy weights
+      ['vbg', 'dt', 'jjs', 'nn'], //baking the best cake
+      ['vbg', 'dt', 'jjs', 'nns'], //playing the most instruments
+      ['vbg', 'prp$', 'jj', 'nn'], 
+      ['vbg', 'prp$', 'jj', 'nns'], //tying my colorful ties 
+      ['vbg', 'prp$', 'jjs', 'nn'], 
+      ['vbg', 'prp$', 'jjs', 'nns'],
+      ['prp$', '*', '*', 'nn'], //my big deep moat
+      ['prp$', '*', '*', 'nns'], //our usage of thimbles
+      ['dt', '*', '*', 'nn'],
+      ['dt', '*', '*', 'nns']
+    ]
+  }
+
+  return sequences[numWords];
+}
+
 //use the parts of speech of the words to see if they would make sense
 //when inserted into the form 'how X is going'
-function getAcceptableGrammar(threeWordPhrase) {
-  var posArray = threeWordPhrase.map(function (elem) {
-    return new rita.RiString(elem).pos(); 
+function getAcceptableGrammar(rawPhrase) {
+  var posArray = rawPhrase.map(function (elem) {
+    return new rita.RiString(elem).pos()[0]; 
   })
-  var acceptable3words = [
-    ['vbg', 'dt', 'nn'], //gerund + noun (being a dog, making my bed)
-    ['vbg', 'jj', 'nn'], //list all possibilities except "gerund noun noun"
-    ['vbg', 'prp$', 'nn'], 
-    ['vbg', '*', 'nns'], //plural
-    ['prp$', '*', 'nn'], //possessive + noun (my best friend, your winged eyeliner)
-    ['prp$', '*', 'nns'], //plural
-    ['dt', '*', 'nn'], //determiner + noun (the united states)
-    ['dt', '*', 'nns'] //plural
-  ];
-  var acceptable2words = [
-    ['*', 'prp$', 'nn'], //possessive + noun (my day, her hair)
-    ['*', 'prp$', 'nns'], //plural
-    ['*', 'dt', 'nn'], //determiner + noun (the night, this year)
-    ['*', 'dt', 'nns'], //plural
-    ['*', 'vbg', '*'], //gerund phrase (dancing tonight, making love)
-    ['*', 'prp$', 'vbg'], //possessive + gerund (my driving)
-    ['*', 'dt', 'vbg'] //determiner + gerund (the painting)
-  ];
-  var passes = [];
-  for(var i = 0; i < acceptable3words.length; i++) {
-    var testArray = acceptable3words[i];
-    for(var j = 0; j < 3; j++) {
-      var expected = testArray[j];
-      if(expected == '*' || expected == posArray[j]) { passes[j] = true; }
-      else { passes[j] = false; }
-    }
-    if ( passes[0] && passes[1] && passes[2] ) {
-      return threeWordPhrase.join(" ");
-    } else {
-      passes[0] = false;
-      passes[1] = false;
-      passes[2] = false;
+  var passes = false;
+  var testAgainst = getAcceptablePOSSequences(posArray.length);
+  outer: for(var i = 0; i < testAgainst.length; i++) {
+    for( var j = 0; j < posArray.length; j++) {
+      if (testAgainst[i][j] === '*' | posArray[j] === testAgainst[i][j]) {
+        if( j === posArray.length - 1 ) {
+          passes = true;
+          break outer;
+        }
+      } else {
+        break;
+      }
     }
   }
-  passes[0] = false;
-  passes[1] = false;
-  passes[2] = false;
-  //then check for 2 word phrases
-  for(var i = 0; i < acceptable2words.length; i++) {
-    var testArray = acceptable2words[i];
-    for(var j = 0; j < 3; j++) {
-      var expected = testArray[j];
-      if(expected == '*' || expected == posArray[j]) { passes[j] = true; }
-      else { passes[j] = false; }
-    }
-    if( passes[1] && passes[2] ) {
-      return threeWordPhrase.slice(1,3).join(" ");
-    }
+  if (passes) {
+    return rawPhrase.join(" ");
+  } else {
+    return "";
   }
-  //no phrases passed.
-  return "";
 }
