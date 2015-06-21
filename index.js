@@ -203,9 +203,14 @@ function getOperative(str, verb) {
   //match restOfString to a regex that identifies thought endings (see function below)
   var matches = thoughtEndings().exec(restOfString);
   if(matches && matches.index) {
-    // console.log("regex matches::"+matches[0]);
-    // console.log("regex match index::"+matches.index);
-    return restOfString.substring(0,matches.index);
+    if(matches[0] === "\"" 
+      || matches[0] === ")" 
+      || matches[0] === "]" 
+      || matches[0] === "}") {
+      return restOfString.substring(0, matches.index + 1);
+    } else {
+      return restOfString.substring(0,matches.index);
+    }
   }
   else
     return restOfString;
