@@ -156,8 +156,14 @@ function searchPart2_Verb(tweetBody) {
     console.log('\033[0m');
     putItTogether(tweetBody, replaceOddPronouns(finalChoice), 
       [" while {#x}",
+      " while {#x}",
+      " while {#x}",
+      " while {#x}",
       ". That's what I get for {#x}",
       ", all because I was {#x}",
+      ". Also I'm {#x}",
+      ". Also I'm {#x}",
+      ". Also I'm {#x}",
       ". Also I'm {#x}"]
     ); 
   });
@@ -166,11 +172,18 @@ function searchPart2_Verb(tweetBody) {
 function putItTogether(tweetBody, rest, extraPhrases) {
   var phrasings = [
     ", in case you were wondering how {#x} is going",
+    ", in case you were wondering how {#x} is going",
+    ", in case you were wondering how {#x} is going",
+    ", in case you were wondering how {#x} is going",
+    ", in case you were wondering how {#x} is going",
+    ", in case you were wondering how {#x} is going", //add weight
+    " because of {#x}",
+    " because of {#x}",
+    " because of {#x}",
+    " because of {#x}",
     " because of {#x}",
     ", so {#x} is going to be {#y}",
-    ". {#x} is {#y}",
-    ", which is {#y} for {#x}",
-    ". That's what's {#y} about {#x}",
+    ". {#x} is {#y}"
   ].concat(extraPhrases);
   var phrasing = phrasings[Math.floor(Math.random() * phrasings.length)];
 
@@ -338,7 +351,7 @@ function thoughtEndings() {
     ,"[=:<]" //punctuation that is likely to start emoticons
     ,"\\n" //newline
     ,"\\s{2,}" //multiple spaces in a row
-    ,"\\s(and|but|or|so|then|because|therefore|n)\\s" //connecting words (with spaces so as not to match 'some' or 'husband')
+    ,"\\s(and|n|but|or|so|then|because|bc|therefore)\\s" //connecting words (with spaces so as not to match 'some' or 'husband')
     ,"(\\s[-–—]\\s)" //hyphen and dashes, but not hyphenated words
     ,"(http)" //a url
     ,"@[a-zA-Z\\d_]+" //a twitter handle
