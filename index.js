@@ -166,7 +166,7 @@ function searchPart2_Verb(tweetBody) {
 function putItTogether(tweetBody, rest, extraPhrases) {
   var phrasings = [
     ", in case you were wondering how {#x} is going",
-    ". All because of {#x}",
+    " because of {#x}",
     ", so {#x} is going to be {#y}",
     ". {#x} is {#y}",
     ", which is {#y} for {#x}",
