@@ -5,7 +5,7 @@ var Twit = require('twit');
 var T = new Twit(require('./config.js'));
 
 var CronJob = require('cron').CronJob;
-new CronJob('0 */20 * * * *', function() {
+new CronJob('0 0 * * * *', function() {
   //tweet once, once an hour
   searchPart1();
 }, null, true, 'America/New_York');
