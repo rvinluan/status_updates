@@ -381,7 +381,6 @@ function getAcceptablePOSSequences(numWords) {
       ['prp$', 'nns'], //our cars
       ['dt', 'nn'], //the night
       ['dt', 'nns'], //the things
-      ['vbg', 'nn'], //making love
       ['vbg', 'nns'], //taking pictures
       ['prp$', 'vbg'], //my driving
       ['dt', 'vbg'] //the painting
